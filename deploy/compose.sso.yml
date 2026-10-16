@@ -1,0 +1,15 @@
+# Single sign-on secrets as files (never as variable values): put them in deploy/sso-secrets/
+# (ignored by git), then point the *_FILE variables at /run/sso/<file>, e.g.
+#   BACKEND_OIDC_CLIENT_SECRET_FILE=/run/sso/oidc_client_secret
+#   BACKEND_LDAP_BIND_PASSWORD_FILE=/run/sso/ldap_bind_password
+#   BACKEND_OIDC_CA_FILE=/run/sso/idp-ca.pem
+# The worker mounts them too: every process validates the configuration at startup.
+# Usage: docker compose -f docker-compose.yml -f deploy/compose.egress.yml \
+#          -f deploy/compose.sso.yml up -d
+services:
+  backend:
+    volumes:
+      - ./deploy/sso-secrets:/run/sso:ro
+  worker:
+    volumes:
+      - ./deploy/sso-secrets:/run/sso:ro

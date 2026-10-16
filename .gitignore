@@ -1,0 +1,52 @@
+# AI assistant context, never committed
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+.clauderules
+.clinerules
+.roomodes
+.cursor/
+AGENTS.md
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.sqlite
+*.db
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dist/
+build/
+coverage/
+frontend/e2e/test-results/
+frontend/playwright-report/
+
+# Build outputs
+reports/
+sbom/
+backups/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+# Single sign-on secret files (deploy/compose.sso.yml)
+deploy/sso-secrets/

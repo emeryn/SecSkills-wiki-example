@@ -1,0 +1,65 @@
+[project]
+name = "wiki-backend"
+version = "0.1.0"
+description = "Wiki API"
+requires-python = ">=3.14"
+dependencies = [
+    "alembic>=1.20",
+    "argon2-cffi>=25.1",
+    "cryptography>=50",
+    "fastapi>=0.143",
+    "ldap3>=2.9",
+    "pillow>=12.3",
+    "psycopg[binary]>=3.3",
+    "pydantic>=2.14",
+    "pydantic-settings>=2.16",
+    "pyjwt[crypto]>=2.10",
+    "pyotp>=2.9",
+    "python-multipart>=0.0.32",
+    "segno>=1.6",
+    "sqlalchemy>=2.1",
+    "uvicorn>=0.54",
+    "webauthn>=2.7",
+]
+
+[dependency-groups]
+dev = [
+    "bandit>=1.8",
+    "httpx>=0.28",
+    "mypy>=1.18",
+    "pip-audit>=2.9",
+    "pytest>=8.4",
+    "ruff>=0.14",
+    "types-ldap3>=2.9",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "N", "SIM", "RUF", "PL"]
+# FastAPI handlers take their dependencies as parameters.
+ignore = ["PLR0913", "PLR0917"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "PLR2004"]
+"migrations/**" = ["N999"]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["migrations/"]
+explicit_package_bases = true
+mypy_path = "."
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers"
+
+[tool.bandit]
+exclude_dirs = ["tests", "migrations"]

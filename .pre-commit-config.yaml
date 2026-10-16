@@ -1,0 +1,44 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.0
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+        files: ^backend/
+      - id: ruff-format
+        files: ^backend/
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.6
+    hooks:
+      - id: bandit
+        args: [-c, backend/pyproject.toml, -q]
+        additional_dependencies: ["bandit[toml]"]
+        files: ^backend/app/
+
+  # Type checking and ESLint need the project dependencies: they run in containers.
+  - repo: local
+    hooks:
+      - id: make-lint
+        name: make lint (mypy, eslint, tsc, prettier)
+        entry: make lint
+        language: system
+        pass_filenames: false
+        files: ^(backend|frontend)/
+        stages: [pre-push]

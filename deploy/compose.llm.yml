@@ -1,0 +1,43 @@
+# Optional local inference server (Ollama) for "Ask the wiki".
+# Usage: docker compose -f docker-compose.yml -f deploy/compose.llm.yml up -d
+# Then in Admin > Settings: Security > Allowed private networks: 172.31.250.0/24, and
+# LLM > URL: http://ollama:11434. The port is never published: only the backend and the worker
+# reach it, on an internal network. Models: see deploy/compose.llm-pull.yml or the admin help.
+services:
+  ollama:
+    image: ${OLLAMA_IMAGE:-wiki-ollama}
+    build:
+      context: .
+      dockerfile: deploy/ollama/Dockerfile
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 200
+    ulimits:
+      core: 0
+    restart: unless-stopped
+    user: "10001:10001"
+    tmpfs: [/tmp]
+    volumes:
+      - ollama_models:/models
+    networks: [llm_net]
+    mem_limit: 8g
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      retries: 5
+      start_period: 20s
+  backend:
+    networks: [backend_net, db_net, llm_net]
+  worker:
+    networks: [db_net, llm_net]
+
+volumes:
+  ollama_models:
+
+networks:
+  llm_net:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24

@@ -1,0 +1,11 @@
+# Outbound access for the backend and the worker: SMTPS (password reset, sign-in and error
+# notifications), remote syslog and webhooks. Destinations are SSRF-checked by the application.
+# Usage: docker compose -f docker-compose.yml -f deploy/compose.egress.yml up -d
+services:
+  backend:
+    networks: [backend_net, db_net, egress_net]
+  worker:
+    networks: [db_net, egress_net]
+
+networks:
+  egress_net:

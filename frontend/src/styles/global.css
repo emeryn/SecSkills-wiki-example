@@ -1,0 +1,113 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--on-primary);
+  --color-danger: var(--danger);
+  --color-on-danger: var(--on-danger);
+  --color-success: var(--success);
+  --color-focus: var(--focus);
+  --font-sans: var(--font-family);
+  --font-mono: var(--font-mono);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --shadow-raised: var(--shadow-raised);
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 2.5rem;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html[data-theme="dark"] {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-surface text-text font-sans text-sm antialiased;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-focus;
+  }
+}
+
+/* Rendered Markdown (sanitized HTML from lib/markdown.ts). */
+@layer components {
+  .wiki-content {
+    @apply max-w-3xl text-base leading-7 text-text;
+  }
+  .wiki-content > * + * {
+    @apply mt-4;
+  }
+  .wiki-content h1 {
+    @apply mt-8 text-3xl font-semibold;
+  }
+  .wiki-content h2 {
+    @apply mt-8 border-b border-border pb-1 text-2xl font-semibold;
+  }
+  .wiki-content h3 {
+    @apply mt-6 text-xl font-semibold;
+  }
+  .wiki-content h4,
+  .wiki-content h5,
+  .wiki-content h6 {
+    @apply mt-4 font-semibold;
+  }
+  .wiki-content a {
+    @apply text-primary underline underline-offset-2 hover:text-primary-hover;
+  }
+  .wiki-content .wiki-link-broken {
+    @apply cursor-help text-danger underline decoration-dashed underline-offset-2;
+  }
+  .wiki-content ul {
+    @apply list-disc pl-6;
+  }
+  .wiki-content ol {
+    @apply list-decimal pl-6;
+  }
+  .wiki-content li + li {
+    @apply mt-1;
+  }
+  .wiki-content blockquote {
+    @apply border-l-4 border-border pl-4 text-text-muted;
+  }
+  .wiki-content code {
+    @apply rounded-sm bg-surface-muted px-1 py-0.5 font-mono text-sm;
+  }
+  .wiki-content pre {
+    @apply overflow-x-auto rounded-md bg-surface-muted p-3;
+  }
+  .wiki-content pre code {
+    @apply bg-transparent p-0;
+  }
+  .wiki-content table {
+    @apply w-full border-collapse text-sm;
+  }
+  .wiki-content th,
+  .wiki-content td {
+    @apply border border-border px-3 py-1.5 text-left;
+  }
+  .wiki-content th {
+    @apply bg-surface-muted font-semibold;
+  }
+  .wiki-content hr {
+    @apply border-border;
+  }
+  .wiki-content img {
+    @apply max-w-full rounded-md;
+  }
+  .wiki-content img[data-blocked] {
+    @apply inline-block rounded-sm border border-dashed border-border px-2 py-1 text-sm text-text-muted;
+  }
+}

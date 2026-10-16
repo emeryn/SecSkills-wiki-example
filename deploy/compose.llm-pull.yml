@@ -1,0 +1,12 @@
+# Temporary internet access for Ollama, only while pulling models; restart without this file
+# afterwards. Air-gapped sites import GGUF files instead (see the admin help, "Ask the wiki").
+# Usage:
+#   docker compose -f docker-compose.yml -f deploy/compose.llm.yml -f deploy/compose.llm-pull.yml up -d ollama
+#   docker compose -f docker-compose.yml -f deploy/compose.llm.yml exec ollama ollama pull <model>
+#   docker compose -f docker-compose.yml -f deploy/compose.llm.yml up -d ollama
+services:
+  ollama:
+    networks: [llm_net, llm_pull_net]
+
+networks:
+  llm_pull_net:

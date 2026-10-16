@@ -1,0 +1,201 @@
+# Starts with a plain `docker compose up` / `podman compose up` on a fresh clone: no .env, no manual step.
+#
+# Secret bootstrap: the one-shot `init` service runs `app.core.bootstrap`, which creates (only if absent)
+# in the `secrets` volume:
+#   app/master.key, app/session.key, app/csrf.key, app/backup.key,
+#   app/bootstrap_admin_password                           0400  10001
+#   db/superuser_password, db/server.key                   0040  10001:70   (postgres only)
+#   db/owner_password, db/runtime_password                 0440  10001:70
+#   db/ca.crt, db/server.crt, tls/tls.crt                  0444
+#   tls/tls.key                                            0040  10001:101  (nginx only)
+# The backend image contains /run/secrets owned by 10001 so the new volume inherits that ownership.
+
+name: wiki
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 200
+  ulimits:
+    core: 0
+  restart: unless-stopped
+
+x-backend-build: &backend-build
+  context: .
+  dockerfile: backend/Dockerfile
+
+x-backend-env: &backend-env
+  BACKEND_LOG_LEVEL: ${BACKEND_LOG_LEVEL:-INFO}
+  BACKEND_PUBLIC_URL: ${BACKEND_PUBLIC_URL:-https://localhost:${FRONTEND_PORT:-8443}}
+  BACKEND_TRUSTED_PROXY_COUNT: "1"
+  BACKEND_SMTP_HOST: ${BACKEND_SMTP_HOST:-}
+  BACKEND_SMTP_PORT: ${BACKEND_SMTP_PORT:-465}
+  BACKEND_SMTP_FROM: ${BACKEND_SMTP_FROM:-wiki@localhost}
+  BACKEND_SMTP_USERNAME: ${BACKEND_SMTP_USERNAME:-}
+  BACKEND_SMTP_PASSWORD_FILE: ${BACKEND_SMTP_PASSWORD_FILE:-}
+  BACKEND_INACTIVE_ACCOUNT_DAYS: ${BACKEND_INACTIVE_ACCOUNT_DAYS:-180}
+  BACKEND_BACKUP_INTERVAL_HOURS: ${BACKEND_BACKUP_INTERVAL_HOURS:-24}
+  BACKEND_BACKUP_RETENTION_COUNT: ${BACKEND_BACKUP_RETENTION_COUNT:-14}
+  # Single sign-on (optional): empty values are ignored; see .env.example.
+  BACKEND_OIDC_ENABLED: ${BACKEND_OIDC_ENABLED:-}
+  BACKEND_OIDC_DISPLAY_NAME: ${BACKEND_OIDC_DISPLAY_NAME:-}
+  BACKEND_OIDC_ISSUER: ${BACKEND_OIDC_ISSUER:-}
+  BACKEND_OIDC_CLIENT_ID: ${BACKEND_OIDC_CLIENT_ID:-}
+  BACKEND_OIDC_CLIENT_SECRET_FILE: ${BACKEND_OIDC_CLIENT_SECRET_FILE:-}
+  BACKEND_OIDC_SCOPES: ${BACKEND_OIDC_SCOPES:-}
+  BACKEND_OIDC_ID_TOKEN_ALGORITHM: ${BACKEND_OIDC_ID_TOKEN_ALGORITHM:-}
+  BACKEND_OIDC_USERNAME_CLAIM: ${BACKEND_OIDC_USERNAME_CLAIM:-}
+  BACKEND_OIDC_EMAIL_CLAIM: ${BACKEND_OIDC_EMAIL_CLAIM:-}
+  BACKEND_OIDC_NAME_CLAIM: ${BACKEND_OIDC_NAME_CLAIM:-}
+  BACKEND_OIDC_GROUPS_CLAIM: ${BACKEND_OIDC_GROUPS_CLAIM:-}
+  BACKEND_OIDC_AUTO_PROVISION: ${BACKEND_OIDC_AUTO_PROVISION:-}
+  BACKEND_OIDC_GROUP_MAPPING: ${BACKEND_OIDC_GROUP_MAPPING:-}
+  BACKEND_OIDC_ADMIN_GROUPS: ${BACKEND_OIDC_ADMIN_GROUPS:-}
+  BACKEND_OIDC_CA_FILE: ${BACKEND_OIDC_CA_FILE:-}
+  BACKEND_LDAP_ENABLED: ${BACKEND_LDAP_ENABLED:-}
+  BACKEND_LDAP_URL: ${BACKEND_LDAP_URL:-}
+  BACKEND_LDAP_START_TLS: ${BACKEND_LDAP_START_TLS:-}
+  BACKEND_LDAP_BIND_DN: ${BACKEND_LDAP_BIND_DN:-}
+  BACKEND_LDAP_BIND_PASSWORD_FILE: ${BACKEND_LDAP_BIND_PASSWORD_FILE:-}
+  BACKEND_LDAP_USER_BASE_DN: ${BACKEND_LDAP_USER_BASE_DN:-}
+  BACKEND_LDAP_USER_FILTER: ${BACKEND_LDAP_USER_FILTER:-}
+  BACKEND_LDAP_USERNAME_ATTRIBUTE: ${BACKEND_LDAP_USERNAME_ATTRIBUTE:-}
+  BACKEND_LDAP_EMAIL_ATTRIBUTE: ${BACKEND_LDAP_EMAIL_ATTRIBUTE:-}
+  BACKEND_LDAP_NAME_ATTRIBUTE: ${BACKEND_LDAP_NAME_ATTRIBUTE:-}
+  BACKEND_LDAP_GROUP_BASE_DN: ${BACKEND_LDAP_GROUP_BASE_DN:-}
+  BACKEND_LDAP_GROUP_FILTER: ${BACKEND_LDAP_GROUP_FILTER:-}
+  BACKEND_LDAP_AUTO_PROVISION: ${BACKEND_LDAP_AUTO_PROVISION:-}
+  BACKEND_LDAP_GROUP_MAPPING: ${BACKEND_LDAP_GROUP_MAPPING:-}
+  BACKEND_LDAP_ADMIN_GROUPS: ${BACKEND_LDAP_ADMIN_GROUPS:-}
+  BACKEND_LDAP_CA_FILE: ${BACKEND_LDAP_CA_FILE:-}
+
+services:
+  init:
+    image: ${BACKEND_IMAGE:-wiki-backend}
+    build: *backend-build
+    <<: *hardening
+    restart: "no"
+    user: "10001:10001"
+    group_add: ["70", "101"]
+    command: ["python", "-m", "app.core.bootstrap"]
+    environment:
+      BACKEND_TLS_HOSTNAMES: ${BACKEND_TLS_HOSTNAMES:-localhost,127.0.0.1}
+    volumes:
+      - secrets:/run/secrets
+    network_mode: none
+    mem_limit: 256m
+
+  db:
+    image: ${DB_IMAGE:-wiki-db}
+    build:
+      context: .
+      dockerfile: deploy/postgres/Dockerfile
+    <<: *hardening
+    user: "70:70"
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/db/superuser_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256 --auth-local=peer
+    tmpfs: [/tmp, /var/run/postgresql]
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - secrets:/run/secrets:ro
+    networks: [db_net]
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "app_owner", "-d", "app"]
+      interval: 10s
+      retries: 10
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  migrate:
+    image: ${BACKEND_IMAGE:-wiki-backend}
+    build: *backend-build
+    <<: *hardening
+    restart: "no"
+    user: "10001:10001"
+    # Applies migrations, then creates the bootstrap administrator if none exists.
+    command: ["python", "-m", "app.cli", "migrate"]
+    environment: *backend-env
+    tmpfs: [/tmp]
+    volumes:
+      - secrets:/run/secrets:ro
+    networks: [db_net]
+    mem_limit: 256m
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    image: ${BACKEND_IMAGE:-wiki-backend}
+    build: *backend-build
+    <<: *hardening
+    user: "10001:10001"
+    environment: *backend-env
+    tmpfs: [/tmp]
+    volumes:
+      - secrets:/run/secrets:ro
+      - attachments:/var/lib/wiki/attachments
+    # No outbound route by default; deploy/compose.egress.yml adds one for SMTP.
+    networks: [backend_net, db_net]
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.healthcheck"]
+      interval: 15s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    image: ${BACKEND_IMAGE:-wiki-backend}
+    build: *backend-build
+    <<: *hardening
+    user: "10001:10001"
+    command: ["python", "-m", "app.worker"]
+    environment: *backend-env
+    tmpfs: [/tmp]
+    volumes:
+      - secrets:/run/secrets:ro
+      - attachments:/var/lib/wiki/attachments
+      # Encrypted backups; the key stays in the secrets volume.
+      - backups:/var/lib/wiki/backups
+    networks: [db_net]
+    mem_limit: 256m
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-wiki-frontend}
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    <<: *hardening
+    user: "101:101"
+    tmpfs: [/tmp]
+    volumes:
+      - secrets:/run/secrets:ro
+    ports:
+      - "${FRONTEND_BIND_ADDRESS:-127.0.0.1}:${FRONTEND_PORT:-8443}:8443"
+    networks: [frontend_net, backend_net]
+    mem_limit: 128m
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  secrets:
+  attachments:
+  backups:
+
+networks:
+  frontend_net:
+  backend_net:
+    internal: true
+  db_net:
+    internal: true
